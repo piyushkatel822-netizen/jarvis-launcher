@@ -176,30 +176,24 @@ class JarvisService : Service() {
         }, 500)
     }
 
+    private var tts: android.speech.tts.TextToSpeech? = null
+
     private fun speakResponse(text: String) {
-
-        val tts = android.speech.tts.TextToSpeech(
-            this
-        ) { status ->
-
-            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-
-                ttsLanguageAndSpeak(
-                    tts,
-                    text
-                )
+        if (tts == null) {
+            tts = android.speech.tts.TextToSpeech(this) { status ->
+                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                    speakWithTts(text)
+                }
             }
+        } else {
+            speakWithTts(text)
         }
     }
 
-    private fun ttsLanguageAndSpeak(
-        tts: android.speech.tts.TextToSpeech,
-        text: String
-    ) {
-
-        tts.language = Locale.US
-
-        tts.speak(
+    private fun speakWithTts(text: String) {
+        val engine = tts ?: return
+        engine.language = Locale.US
+        engine.speak(
             text,
             android.speech.tts.TextToSpeech.QUEUE_FLUSH,
             null,
