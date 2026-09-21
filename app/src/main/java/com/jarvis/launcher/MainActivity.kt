@@ -2,8 +2,11 @@ package com.jarvis.launcher
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
@@ -11,105 +14,106 @@ import android.widget.TextView
 
 class MainActivity : Activity() {
 
-    private val microphoneRequestCode = 100
-
-    private lateinit var statusText: TextView
-    private lateinit var startButton: Button
+    private lateinit var status: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        createInterface()
-        updatePermissionStatus()
+        buildUI()
     }
 
-    private fun createInterface() {
+    private fun buildUI() {
+
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setPadding(40, 40, 40, 40)
         }
 
-        statusText = TextView(this).apply {
+        status = TextView(this).apply {
+            text = "JARVIS\n\nReady"
             textSize = 24f
             gravity = Gravity.CENTER
         }
 
-        startButton = Button(this).apply {
-            text = "START JARVIS"
-            textSize = 18f
+        val microphoneButton = Button(this).apply {
+            text = "ALLOW MICROPHONE"
             setOnClickListener {
-                updatePermissionStatus()
+                requestMicrophone()
             }
         }
 
-        layout.addView(
-            statusText,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        layout.addView(
-            startButton,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = 40
+        val overlayButton = Button(this).apply {
+            text = "ALLOW TOP JARVIS"
+            setOnClickListener {
+                openOverlaySettings()
             }
-        )
+        }
+
+        val startButton = Button(this).apply {
+            text = "START JARVIS"
+            setOnClickListener {
+                startJarvis()
+            }
+        }
+
+        val stopButton = Button(this).apply {
+            text = "STOP JARVIS"
+            setOnClickListener {
+                stopService(
+                    Intent(this@MainActivity, JarvisService::class.java)
+                )
+                status.text = "JARVIS\n\nStopped"
+            }
+        }
+
+        layout.addView(status)
+        layout.addView(microphoneButton)
+        layout.addView(overlayButton)
+        layout.addView(startButton)
+        layout.addView(stopButton)
 
         setContentView(layout)
     }
 
-    private fun updatePermissionStatus() {
-        val microphoneAllowed =
-            checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-                    PackageManager.PERMISSION_GRANTED
-
-        if (microphoneAllowed) {
-            statusText.text = "JARVIS\n\n🎤 Microphone Ready"
-            startButton.text = "START JARVIS"
-        } else {
-            statusText.text = "JARVIS\n\n🎤 Microphone permission required"
-            startButton.text = "ALLOW MICROPHONE"
-            requestMicrophonePermission()
-        }
-    }
-
-    private fun requestMicrophonePermission() {
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+    private fun requestMicrophone() {
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
             requestPermissions(
                 arrayOf(Manifest.permission.RECORD_AUDIO),
-                microphoneRequestCode
+                100
             )
         }
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(
-            requestCode,
-            permissions,
-            grantResults
+    private fun openOverlaySettings() {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:$packageName")
         )
-
-        if (requestCode == microphoneRequestCode) {
-            updatePermissionStatus()
-        }
+        startActivity(intent)
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (::statusText.isInitialized) {
-            updatePermissionStatus()
+    private fun startJarvis() {
+
+        if (
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestMicrophone()
+            return
         }
+
+        if (!Settings.canDrawOverlays(this)) {
+            openOverlaySettings()
+            return
+        }
+
+        val intent = Intent(this, JarvisService::class.java)
+
+        startForegroundService(intent)
+
+        status.text = "JARVIS\n\n● ACTIVE"
     }
 }
